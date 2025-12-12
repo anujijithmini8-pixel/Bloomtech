@@ -33,6 +33,6 @@ CREATE TABLE IF NOT EXISTS projects (
   initial_cost_budget NUMERIC NOT NULL,
   extra_budget_allocation NUMERIC NOT NULL,
   payment_type TEXT NOT NULL,
-  staus TEXT NOT NULL
+  status TEXT NOT NULL
 );
 

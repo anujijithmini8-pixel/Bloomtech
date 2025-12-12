@@ -61,6 +61,10 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
   const [extraBudgetAllocation, setExtraBudgetAllocation] = useState('')
   const [paymentType, setPaymentType] = useState('')
   const [projectStatus, setProjectStatus] = useState('')
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null)
+  const [projectEditModalOpen, setProjectEditModalOpen] = useState(false)
+  const [projectDeleteModalOpen, setProjectDeleteModalOpen] = useState(false)
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true)
@@ -273,7 +277,7 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
           initial_cost_budget: initialBudgetNum,
           extra_budget_allocation: extraBudgetNum,
           payment_type: paymentType,
-          staus: projectStatus,
+          status: projectStatus,
         }),
       })
       if (!r.ok) {
@@ -289,6 +293,81 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
       setSaving(false)
     }
   }
+
+  const openEditProjectModal = (project: Project) => {
+    setEditingProject(project)
+    setProjectName(project.project_name)
+    setCustomerName(project.customer_name)
+    setProjectDescription(project.description || '')
+    setInitialCostBudget(String(project.initial_cost_budget))
+    setExtraBudgetAllocation(String(project.extra_budget_allocation))
+    setPaymentType(project.payment_type)
+    setProjectStatus(project.status)
+    setProjectEditModalOpen(true)
+  }
+
+  const updateProject = async () => {
+    if (!editingProject) return
+    if (!projectName || !customerName || initialCostBudget === '' || extraBudgetAllocation === '' || !paymentType || !projectStatus) {
+      alert('Missing required fields')
+      return
+    }
+    const initialBudgetNum = Number(initialCostBudget)
+    const extraBudgetNum = Number(extraBudgetAllocation)
+    if (Number.isNaN(initialBudgetNum) || Number.isNaN(extraBudgetNum)) {
+      alert('Budget fields must be numbers')
+      return
+    }
+    setSaving(true)
+    try {
+      const r = await fetch(`http://localhost:3000/projects/${editingProject.project_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_name: projectName,
+          customer_name: customerName,
+          description: projectDescription || null,
+          initial_cost_budget: initialBudgetNum,
+          extra_budget_allocation: extraBudgetNum,
+          payment_type: paymentType,
+          status: projectStatus,
+        }),
+      })
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}))
+        alert(data.error || 'Failed to update project')
+        return
+      }
+      alert('Project updated')
+      setProjectEditModalOpen(false)
+      resetProjectForm()
+      await fetchProjects()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteProjectConfirm = async () => {
+    if (!deletingProject) return
+    setSaving(true)
+    try {
+      const r = await fetch(`http://localhost:3000/projects/${deletingProject.project_id}`, {
+        method: 'DELETE',
+      })
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}))
+        alert(data.error || 'Failed to delete project')
+        return
+      }
+      alert('Project deleted')
+      setProjectDeleteModalOpen(false)
+      setDeletingProject(null)
+      await fetchProjects()
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div style={{ height: '100vh', width: '100%', display: 'grid', gridTemplateRows: '56px 1fr', background: 'var(--bg)', color: '#111', overflow: 'hidden' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', background: 'var(--primary)', color: '#fff', overflow: 'hidden', flexWrap: 'wrap', gap: 8 }}>
@@ -396,6 +475,7 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
                         <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Extra Budget</th>
                         <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Payment Type</th>
                         <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Status</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -409,6 +489,10 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
                           <td style={{ padding: '12px 16px' }}>{proj.extra_budget_allocation}</td>
                           <td style={{ padding: '12px 16px' }}>{proj.payment_type}</td>
                           <td style={{ padding: '12px 16px' }}>{proj.status}</td>
+                          <td style={{ padding: '12px 16px', display: 'flex', gap: 8 }}>
+                            <button onClick={() => openEditProjectModal(proj)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #4CAF50', background: '#4CAF50', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>Edit</button>
+                            <button onClick={() => { setDeletingProject(proj); setProjectDeleteModalOpen(true) }} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #f44336', background: '#f44336', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>Delete</button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -599,6 +683,62 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
               <button onClick={() => { setDeleteOpen(false); setDeletingEmployee(null) }} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: '#b1b1b1', color: '#111' }}>Cancel</button>
               <button disabled={saving} onClick={deleteEmployee} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: '#f44336', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Deleting...' : 'Delete'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {projectEditModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000, overflowY: 'auto', padding: '20px' }} onClick={() => { setProjectEditModalOpen(false); resetProjectForm() }}>
+          <div style={{ width: 'min(600px, 92vw)', maxHeight: '90vh', padding: 24, borderRadius: 16, background: '#063062', color: '#111', border: '1px solid var(--primary)', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ color: "#e41212ff", marginTop: 0 }}>Edit Project</h2>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Project Name *</span>
+                <input value={projectName} onChange={e => setProjectName(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Customer Name *</span>
+                <input value={customerName} onChange={e => setCustomerName(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Description</span>
+                <textarea value={projectDescription} onChange={e => setProjectDescription(e.target.value)} rows={3} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', resize: 'vertical' }} />
+              </label>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Initial Cost Budget *</span>
+                <input type="number" value={initialCostBudget} onChange={e => setInitialCostBudget(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Extra Budget Allocation *</span>
+                <input type="number" value={extraBudgetAllocation} onChange={e => setExtraBudgetAllocation(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Payment Type *</span>
+                <input value={paymentType} onChange={e => setPaymentType(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Status *</span>
+                <input value={projectStatus} onChange={e => setProjectStatus(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                <button onClick={() => { setProjectEditModalOpen(false); resetProjectForm() }} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: '#b1b1b1', color: '#111' }}>Cancel</button>
+                <button disabled={saving} onClick={updateProject} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: 'var(--accent)', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Updating...' : 'Update'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {projectDeleteModalOpen && deletingProject && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000 }} onClick={() => { setProjectDeleteModalOpen(false); setDeletingProject(null) }}>
+          <div style={{ width: 'min(400px, 92vw)', padding: 24, borderRadius: 16, background: '#063062', color: '#111', border: '1px solid var(--primary)' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ color: "#e41212ff", marginTop: 0 }}>Delete Project</h2>
+            <p style={{ color: "#fff", margin: '16px 0' }}>
+              Are you sure you want to delete project <strong>{deletingProject.project_name}</strong> (ID: {deletingProject.project_id})?
+            </p>
+            <p style={{ color: "#fff", margin: '16px 0', fontSize: '14px' }}>This action cannot be undone.</p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button onClick={() => { setProjectDeleteModalOpen(false); setDeletingProject(null) }} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: '#b1b1b1', color: '#111' }}>Cancel</button>
+              <button disabled={saving} onClick={deleteProjectConfirm} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: '#f44336', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Deleting...' : 'Delete'}</button>
             </div>
           </div>
         </div>
