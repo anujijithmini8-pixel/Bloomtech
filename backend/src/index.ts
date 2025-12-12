@@ -3,12 +3,14 @@ import cors from 'cors'
 import { pool } from './db'
 import bcrypt from 'bcryptjs'
 import employeeRoutes from './routes/employees'
+import projectRoutes from './routes/projects'
 
 const app = express()
 app.use(cors())
 app.use(express.json())
 
 app.use('/employees', employeeRoutes)
+app.use('/projects', projectRoutes)
 
 
 app.post('/auth/login', async (req, res) => {

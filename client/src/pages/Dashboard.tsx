@@ -18,8 +18,19 @@ type Employee = {
   created_at: string
 }
 
+type Project = {
+  project_id: number
+  project_name: string
+  customer_name: string
+  description: string | null
+  initial_cost_budget: number
+  extra_budget_allocation: number
+  payment_type: string
+  status: string
+}
+
 export default function Dashboard({ user, onLogout }: { user: User; onLogout?: () => void }) {
-  const [tab, setTab] = useState<'home' | 'employees' | 'accounting'>('home')
+  const [tab, setTab] = useState<'home' | 'employees' | 'projects' | 'accounting'>('home')
   const [navOpen, setNavOpen] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
@@ -40,6 +51,16 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
   const [saving, setSaving] = useState(false)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
+  const [projectModalOpen, setProjectModalOpen] = useState(false)
+  const [projectName, setProjectName] = useState('')
+  const [customerName, setCustomerName] = useState('')
+  const [projectDescription, setProjectDescription] = useState('')
+  const [initialCostBudget, setInitialCostBudget] = useState('')
+  const [extraBudgetAllocation, setExtraBudgetAllocation] = useState('')
+  const [paymentType, setPaymentType] = useState('')
+  const [projectStatus, setProjectStatus] = useState('')
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true)
@@ -63,6 +84,29 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
       fetchEmployees()
     }
   }, [tab, fetchEmployees])
+
+  const fetchProjects = useCallback(async () => {
+    setProjectsLoading(true)
+    try {
+      const r = await fetch('http://localhost:3000/projects')
+      if (!r.ok) {
+        console.error('Failed to fetch projects')
+        return
+      }
+      const data = await r.json()
+      setProjects(data.projects || [])
+    } catch (err) {
+      console.error('Error fetching projects:', err)
+    } finally {
+      setProjectsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'projects') {
+      fetchProjects()
+    }
+  }, [tab, fetchProjects])
   const resetForm = () => {
     setEmployeeNumber('')
     setFirstName('')
@@ -76,6 +120,16 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
     setDesignation('')
     setTax('')
     setEditingEmployee(null)
+  }
+
+  const resetProjectForm = () => {
+    setProjectName('')
+    setCustomerName('')
+    setProjectDescription('')
+    setInitialCostBudget('')
+    setExtraBudgetAllocation('')
+    setPaymentType('')
+    setProjectStatus('')
   }
 
   const openEditModal = (employee: Employee) => {
@@ -195,6 +249,46 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
       setSaving(false)
     }
   }
+
+  const addProject = async () => {
+    if (!projectName || !customerName || initialCostBudget === '' || extraBudgetAllocation === '' || !paymentType || !projectStatus) {
+      alert('Missing required fields')
+      return
+    }
+    const initialBudgetNum = Number(initialCostBudget)
+    const extraBudgetNum = Number(extraBudgetAllocation)
+    if (Number.isNaN(initialBudgetNum) || Number.isNaN(extraBudgetNum)) {
+      alert('Budget fields must be numbers')
+      return
+    }
+    setSaving(true)
+    try {
+      const r = await fetch('http://localhost:3000/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_name: projectName,
+          customer_name: customerName,
+          description: projectDescription || null,
+          initial_cost_budget: initialBudgetNum,
+          extra_budget_allocation: extraBudgetNum,
+          payment_type: paymentType,
+          staus: projectStatus,
+        }),
+      })
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}))
+        alert(data.error || 'Failed to add project')
+        return
+      }
+      alert('Project added')
+      setProjectModalOpen(false)
+      resetProjectForm()
+      await fetchProjects()
+    } finally {
+      setSaving(false)
+    }
+  }
   return (
     <div style={{ height: '100vh', width: '100%', display: 'grid', gridTemplateRows: '56px 1fr', background: 'var(--bg)', color: '#111', overflow: 'hidden' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', background: 'var(--primary)', color: '#fff', overflow: 'hidden', flexWrap: 'wrap', gap: 8 }}>
@@ -209,6 +303,7 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
           <button onClick={() => setNavOpen(o => !o)} aria-label="Collapse/Expand menu" style={{ textAlign: 'center', padding: '8px', borderRadius: 8, border: '1px solid var(--primary)', background: 'var(--accent)', color: '#fff', cursor: 'pointer' }}>{navOpen ? '«' : '»'}</button>
           <button onClick={() => setTab('home')} title="Overview" style={{ textAlign: navOpen ? 'left' : 'center', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: tab === 'home' ? 'var(--accent)' : 'transparent', color: '#fff', cursor: 'pointer' }}>{navOpen ? 'Overview' : '🏠'}</button>
           <button onClick={() => setTab('employees')} title="Employee Management" style={{ textAlign: navOpen ? 'left' : 'center', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: tab === 'employees' ? 'var(--accent)' : 'transparent', color: '#fff', cursor: 'pointer' }}>{navOpen ? 'Employee Management' : '👥'}</button>
+          <button onClick={() => setTab('projects')} title="Projects" style={{ textAlign: navOpen ? 'left' : 'center', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: tab === 'projects' ? 'var(--accent)' : 'transparent', color: '#fff', cursor: 'pointer' }}>{navOpen ? 'Projects' : '📁'}</button>
           <button onClick={() => setTab('accounting')} title="Accounting" style={{ textAlign: navOpen ? 'left' : 'center', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: tab === 'accounting' ? 'var(--accent)' : 'transparent', color: '#fff', cursor: 'pointer' }}>{navOpen ? 'Accounting' : '💼'}</button>
         </aside>
         <section style={{ flex: 1, height: '100%', background: 'transparent', borderRadius: 0, border: 'none', padding: 24, display: 'grid', placeItems: 'start', alignContent: 'start', gap: 16 }}>
@@ -269,6 +364,51 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
                               <button onClick={() => openDeleteModal(emp)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #f44336', background: '#f44336', color: '#fff', cursor: 'pointer', fontSize: '12px' }}>Delete</button>
                             </div>
                           </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+          {tab === 'projects' && (
+            <div style={{ width: '100%', display: 'grid', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h1 style={{ marginTop: 0, fontSize: 28 }}>Projects</h1>
+                <button style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: 'var(--accent)', color: '#fff', cursor: 'pointer' }} onClick={() => setProjectModalOpen(true)}>+ Add Project</button>
+              </div>
+              <p style={{ margin: 0 }}>Track projects and budgets here.</p>
+              {projectsLoading ? (
+                <div style={{ padding: 24, textAlign: 'center' }}>Loading projects...</div>
+              ) : projects.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', background: '#f5f5f5', borderRadius: 8 }}>No projects found. Add your first project!</div>
+              ) : (
+                <div style={{ width: '100%', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontSize: '14px' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--primary)', color: '#fff' }}>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>ID</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Project Name</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Customer Name</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Description</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Initial Budget</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Extra Budget</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Payment Type</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projects.map((proj, idx) => (
+                        <tr key={proj.project_id} style={{ borderBottom: idx < projects.length - 1 ? '1px solid #e0e0e0' : 'none' }}>
+                          <td style={{ padding: '12px 16px' }}>{proj.project_id}</td>
+                          <td style={{ padding: '12px 16px' }}>{proj.project_name}</td>
+                          <td style={{ padding: '12px 16px' }}>{proj.customer_name}</td>
+                          <td style={{ padding: '12px 16px', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={proj.description ?? ''}>{proj.description ?? '-'}</td>
+                          <td style={{ padding: '12px 16px' }}>{proj.initial_cost_budget}</td>
+                          <td style={{ padding: '12px 16px' }}>{proj.extra_budget_allocation}</td>
+                          <td style={{ padding: '12px 16px' }}>{proj.payment_type}</td>
+                          <td style={{ padding: '12px 16px' }}>{proj.status}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -341,6 +481,47 @@ export default function Dashboard({ user, onLogout }: { user: User; onLogout?: (
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
                 <button onClick={() => { setAddOpen(false); resetForm() }} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: '#b1b1b1', color: '#111' }}>Cancel</button>
                 <button disabled={saving} onClick={addEmployee} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: 'var(--accent)', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Adding...' : 'Add'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {projectModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000, overflowY: 'auto', padding: '20px' }} onClick={() => { setProjectModalOpen(false); resetProjectForm() }}>
+          <div style={{ width: 'min(600px, 92vw)', maxHeight: '90vh', padding: 24, borderRadius: 16, background: '#063062', color: '#111', border: '1px solid var(--primary)', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ color: "#e41212ff", marginTop: 0 }}>Add Project</h2>
+             <div style={{ display: 'grid', gap: 12 }}>
+              <label style={{color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Project Name *</span>
+                <input value={projectName} onChange={e => setProjectName(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <label style={{color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Customer Name *</span>
+                <input value={customerName} onChange={e => setCustomerName(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Description</span>
+                <textarea value={projectDescription} onChange={e => setProjectDescription(e.target.value)} rows={3} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', resize: 'vertical' }} />
+              </label>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Initial Cost Budget *</span>
+                <input type="number" value={initialCostBudget} onChange={e => setInitialCostBudget(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Extra Budget Allocation *</span>
+                <input type="number" value={extraBudgetAllocation} onChange={e => setExtraBudgetAllocation(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Payment Type *</span>
+                <input value={paymentType} onChange={e => setPaymentType(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <label style={{ color: "#fff", display: 'grid', gap: 6 }}>
+                <span>Status *</span>
+                <input value={projectStatus} onChange={e => setProjectStatus(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)' }} required />
+              </label>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                <button onClick={() => { setProjectModalOpen(false); resetProjectForm() }} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: '#b1b1b1', color: '#111' }}>Cancel</button>
+                <button disabled={saving} onClick={addProject} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--primary)', background: 'var(--accent)', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Adding...' : 'Add'}</button>
               </div>
             </div>
           </div>

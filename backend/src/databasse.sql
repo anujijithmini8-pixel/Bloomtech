@@ -24,3 +24,15 @@ CREATE TABLE IF NOT EXISTS employees (
   created_at TIMESTAMP DEFAULT now()
 );
 
+-- Projects table
+CREATE TABLE IF NOT EXISTS projects (
+  project_id SERIAL PRIMARY KEY,
+  projects_name TEXT NOT NULL,
+  customer_name TEXT NOT NULL,
+  description TEXT,
+  initial_cost_budget NUMERIC NOT NULL,
+  extra_budget_allocation NUMERIC NOT NULL,
+  payment_type TEXT NOT NULL,
+  staus TEXT NOT NULL
+);
+
